@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Inventory & Sales Management{% endblock %} | StockPulse Docker</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body class="bg-light">
+
+    <!-- Top Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top border-bottom border-secondary-subtle shadow-sm py-2">
+        <div class="container-fluid px-lg-4">
+            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="{{ url_for('dashboard') }}">
+                <span class="badge bg-primary rounded-3 p-2 d-inline-flex align-items-center justify-content-center">
+                    <i class="bi bi-box-seam fs-5"></i>
+                </span>
+                <span>
+                    StockPulse <span class="badge text-bg-info text-dark rounded-pill ms-1" style="font-size: 0.65rem; font-family: 'JetBrains Mono', monospace;">DOCKERIZED</span>
+                </span>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarMain">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3 gap-lg-1">
+                    <li class="nav-item">
+                        <a class="nav-link px-3 {% if request.path == '/' %}active fw-semibold{% endif %}" href="{{ url_for('dashboard') }}">
+                            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 {% if request.path.startswith('/products') %}active fw-semibold{% endif %}" href="{{ url_for('products.index') }}">
+                            <i class="bi bi-boxes me-1"></i> Products
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 {% if request.path.startswith('/inventory') %}active fw-semibold{% endif %}" href="{{ url_for('inventory.index') }}">
+                            <i class="bi bi-arrow-left-right me-1"></i> Stock Movements
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 {% if request.path.startswith('/sales') %}active fw-semibold{% endif %}" href="{{ url_for('sales.index') }}">
+                            <i class="bi bi-receipt-cutoff me-1"></i> Sales & Orders
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Docker Architecture Status Indicator -->
+                <div class="d-flex align-items-center gap-2 mt-3 mt-lg-0">
+                    <div class="docker-status-chip d-flex align-items-center gap-2 px-3 py-1 bg-black bg-opacity-50 rounded-pill border border-secondary text-white-50 small">
+                        <span class="status-indicator"></span>
+                        <i class="bi bi-hdd-network text-info"></i>
+                        <span class="font-monospace text-light">app ↔ mysql (Compose Net)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="container-fluid px-lg-4 py-4">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="row mb-3">
+                    <div class="col-12">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm d-flex align-items-center gap-2" role="alert">
+                                {% if category == 'success' %}
+                                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                {% elif category == 'danger' %}
+                                    <i class="bi bi-exclamation-octagon-fill text-danger fs-5"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                                {% else %}
+                                    <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+                                {% endif %}
+                                <div class="flex-grow-1">{{ message }}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% if not_found %}
+            <div class="text-center py-5">
+                <i class="bi bi-question-circle text-muted display-1"></i>
+                <h2 class="mt-3">404 - Page Not Found</h2>
+                <p class="text-muted">The resource you requested does not exist.</p>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Return to Dashboard</a>
+            </div>
+        {% elif server_error %}
+            <div class="text-center py-5">
+                <i class="bi bi-exclamation-triangle text-danger display-1"></i>
+                <h2 class="mt-3">500 - Server Error</h2>
+                <p class="text-muted">An error occurred while processing the request.</p>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Return to Dashboard</a>
+            </div>
+        {% else %}
+            {% block content %}{% endblock %}
+        {% endif %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer bg-white border-top py-3 mt-5">
+        <div class="container-fluid px-lg-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 text-muted small">
+                <span><strong>StockPulse</strong> • Dockerized Multi-Container System</span>
+                <span class="text-secondary">|</span>
+                <span>Python Flask & MySQL 8</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 small">
+                <span class="badge bg-secondary-subtle text-secondary font-monospace">Container: Flask :5000</span>
+                <span class="badge bg-secondary-subtle text-secondary font-monospace">Storage: mysql_data (Named Volume)</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

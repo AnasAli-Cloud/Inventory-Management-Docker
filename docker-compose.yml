@@ -1,0 +1,114 @@
+# ============================================================
+# docker-compose.yml — Multi-Container Orchestration
+# ============================================================
+# Defines and connects two containers:
+#   1. app  — Python Flask (built from our Dockerfile)
+#   2. db   — MySQL 8 (official image from Docker Hub)
+#
+# KEY CONCEPT: Both containers share the same Docker network
+# (created automatically by Compose). The Flask app reaches
+# MySQL at hostname "db" — NOT "localhost".
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # Service 1: Flask Web Application
+  # ----------------------------------------------------------
+  app:
+    build:
+      context: .          # Build context is the project root
+      dockerfile: Dockerfile
+    container_name: stockpulse_app
+    restart: unless-stopped
+
+    # Map host port 5000 → container port 5000
+    # Format: "HOST:CONTAINER"
+    ports:
+      - "5000:5000"
+
+    # Load environment variables from the .env file
+    env_file:
+      - .env
+
+    # Override specific variables for the Compose network
+    # DB_HOST must match the MySQL service name below ("db")
+    environment:
+      DB_HOST: db          # ← This is the MySQL container's hostname on the Docker network
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+
+    # Wait for db to be healthy before starting app
+    depends_on:
+      db:
+        condition: service_healthy
+
+    # Mount app code for live development (optional, remove for pure production)
+    volumes:
+      - ./app:/app
+
+    networks:
+      - inventory_network
+
+  # ----------------------------------------------------------
+  # Service 2: MySQL Database
+  # ----------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: stockpulse_db
+    restart: unless-stopped
+
+    # MySQL environment variables (used by the official image's entrypoint)
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+
+    # Healthcheck: Compose waits until MySQL is ready before starting the app
+    # This is critical — MySQL takes several seconds to initialize on first boot
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    volumes:
+      # Named volume: persists MySQL data across container restarts and removals
+      # Without this, all data disappears when the container stops!
+      - mysql_data:/var/lib/mysql
+
+      # Bind-mount init.sql: runs automatically when database is first created
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    networks:
+      - inventory_network
+
+    # Optional: expose MySQL port to the host for tools like DBeaver / TablePlus
+    # Comment this out in production to keep the database private
+    ports:
+      - "3307:3306"     # Host 3307 → Container 3306 (avoids conflict with local MySQL)
+
+# ----------------------------------------------------------
+# Networks
+# ----------------------------------------------------------
+networks:
+  inventory_network:
+    # Compose creates a custom bridge network.
+    # Both containers join this network and can reach each other
+    # by service name (app talks to db as hostname "db").
+    driver: bridge
+
+# ----------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------
+volumes:
+  mysql_data:
+    # Named volume managed by Docker.
+    # Data survives: docker compose down
+    # Data is removed only with: docker compose down -v
+    driver: local

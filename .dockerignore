@@ -1,0 +1,58 @@
+# ==============================================================
+# .dockerignore — Files excluded from Docker build context
+# ==============================================================
+# Similar to .gitignore but for Docker. When you run "docker build",
+# Docker sends the entire build context (the project folder) to the
+# Docker daemon. Excluding unnecessary files makes this faster and
+# keeps the final image smaller and more secure.
+# ==============================================================
+
+# Git version control
+.git
+.gitignore
+
+# Python bytecode and cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+.Python
+
+# Virtual environments (NEVER include these in Docker images)
+venv/
+.venv/
+env/
+ENV/
+
+# Development artifacts
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# Editor/IDE config
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Environment files (secrets must not be baked into the image)
+.env
+.env.*
+
+# Documentation and markdown (not needed at runtime)
+README.md
+docs/
+
+# Docker files themselves (no need to copy Dockerfile inside the image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Test files
+tests/
+test_*
+*_test.py
+pytest.ini
+.pytest_cache/

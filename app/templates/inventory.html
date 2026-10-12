@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Movements{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+        <h2 class="h3 fw-bold mb-1">Stock Movements</h2>
+        <p class="text-muted small mb-0">Adjust stock levels with Stock-In or Stock-Out operations. Every change is logged for audit.</p>
+    </div>
+    <button class="btn btn-primary btn-sm px-3" data-bs-toggle="modal" data-bs-target="#adjustStockModal">
+        <i class="bi bi-arrow-left-right me-1"></i> Adjust Stock
+    </button>
+</div>
+
+<!-- Current Inventory Levels -->
+<div class="card bg-white mb-4">
+    <div class="card-header bg-white border-0 py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-boxes text-primary me-2"></i>Current Inventory Levels</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>SKU</th>
+                    <th>Category</th>
+                    <th>In Stock</th>
+                    <th>Min Threshold</th>
+                    <th>Status</th>
+                    <th>Quick Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td class="fw-semibold">{{ p.name }}</td>
+                    <td><span class="badge bg-light text-dark border font-monospace">{{ p.sku }}</span></td>
+                    <td><span class="badge bg-secondary-subtle text-secondary">{{ p.category_name or 'Unassigned' }}</span></td>
+                    <td>
+                        <span class="fw-bold fs-5">{{ p.quantity }}</span>
+                        <span class="text-muted small ms-1">units</span>
+                    </td>
+                    <td class="text-muted">≥ {{ p.min_threshold }}</td>
+                    <td>
+                        <span class="badge {{ p.badge_class }}">{{ p.status }}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-success-subtle border border-success-subtle text-success fw-semibold quick-in-btn"
+                                    data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="IN"
+                                    data-bs-toggle="modal" data-bs-target="#adjustStockModal">
+                                <i class="bi bi-arrow-down-left me-1"></i> IN
+                            </button>
+                            <button class="btn btn-sm btn-danger-subtle border border-danger-subtle text-danger fw-semibold quick-out-btn"
+                                    data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="OUT"
+                                    data-bs-toggle="modal" data-bs-target="#adjustStockModal"
+                                    {% if p.quantity == 0 %}disabled{% endif %}>
+                                <i class="bi bi-arrow-up-right me-1"></i> OUT
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="bi bi-boxes display-6 d-block mb-2"></i>
+                        No products found. <a href="{{ url_for('products.index') }}">Add products first.</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Audit Log -->
+<div class="card bg-white">
+    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0"><i class="bi bi-clock-history text-secondary me-2"></i>Movement Audit Log <span class="badge bg-secondary ms-1">Last 50 Events</span></h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Type</th>
+                    <th>Product</th>
+                    <th>SKU</th>
+                    <th>Units Changed</th>
+                    <th>Reason / Note</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td class="font-monospace text-muted small">{{ log.id }}</td>
+                    <td>
+                        {% if log.change_type == 'IN' %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle d-inline-flex align-items-center gap-1">
+                                <i class="bi bi-arrow-down-left"></i> Stock IN
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle d-inline-flex align-items-center gap-1">
+                                <i class="bi bi-arrow-up-right"></i> Stock OUT
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-semibold">{{ log.product_name }}</td>
+                    <td><span class="font-monospace small text-muted">{{ log.sku }}</span></td>
+                    <td>
+                        <span class="fw-bold {% if log.change_type == 'IN' %}text-success{% else %}text-danger{% endif %}">
+                            {% if log.change_type == 'IN' %}+{% else %}-{% endif %}{{ log.quantity }}
+                        </span>
+                    </td>
+                    <td class="text-muted small" title="{{ log.reason }}">
+                        <span class="d-inline-block text-truncate" style="max-width: 280px;">{{ log.reason }}</span>
+                    </td>
+                    <td class="text-muted small">{{ log.created_at.strftime('%b %d, %Y %H:%M') if log.created_at else 'N/A' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">No stock movement events logged yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Adjust Stock -->
+<div class="modal fade" id="adjustStockModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('inventory.adjust_stock') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-arrow-left-right text-primary me-2"></i>Adjust Stock Level</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Change Type Selector -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Operation Type *</label>
+                        <div class="d-flex gap-2">
+                            <input type="radio" class="btn-check" name="change_type" id="typeIn" value="IN" required>
+                            <label class="btn btn-outline-success w-50 d-flex align-items-center justify-content-center gap-2" for="typeIn">
+                                <i class="bi bi-arrow-down-left"></i> Stock IN (Receive)
+                            </label>
+
+                            <input type="radio" class="btn-check" name="change_type" id="typeOut" value="OUT">
+                            <label class="btn btn-outline-danger w-50 d-flex align-items-center justify-content-center gap-2" for="typeOut">
+                                <i class="bi bi-arrow-up-right"></i> Stock OUT (Dispatch)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Product Select -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Product *</label>
+                        <select name="product_id" id="adjustProductSelect" class="form-select" required>
+                            <option value="">Choose a product...</option>
+                            {% for p in products %}
+                                <option value="{{ p.id }}" data-qty="{{ p.quantity }}">
+                                    {{ p.name }} — {{ p.quantity }} in stock
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div id="currentStockInfo" class="form-text mt-1 d-none">
+                            Current stock: <strong id="currentStockValue">0</strong> units
+                        </div>
+                    </div>
+
+                    <!-- Quantity -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Quantity *</label>
+                        <input type="number" name="quantity" class="form-control" min="1" placeholder="Enter units to add or remove" required>
+                    </div>
+
+                    <!-- Reason -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Reason / Note</label>
+                        <input type="text" name="reason" class="form-control" placeholder="e.g. Supplier delivery, Damaged goods, etc.">
+                        <div class="form-text">Leave blank for auto-generated reason.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check2-circle me-1"></i> Apply Change</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const productSelect = document.getElementById('adjustProductSelect');
+    const stockInfo = document.getElementById('currentStockInfo');
+    const stockValue = document.getElementById('currentStockValue');
+
+    // Show current stock when product is selected
+    productSelect.addEventListener('change', function () {
+        const selected = this.options[this.selectedIndex];
+        if (selected.value) {
+            stockValue.textContent = selected.getAttribute('data-qty');
+            stockInfo.classList.remove('d-none');
+        } else {
+            stockInfo.classList.add('d-none');
+        }
+    });
+
+    // Quick-action buttons: pre-fill the modal
+    document.querySelectorAll('.quick-in-btn, .quick-out-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const productId = this.getAttribute('data-id');
+            const type = this.getAttribute('data-type');
+
+            // Select the radio button
+            document.getElementById(type === 'IN' ? 'typeIn' : 'typeOut').checked = true;
+
+            // Select the product
+            productSelect.value = productId;
+            productSelect.dispatchEvent(new Event('change'));
+        });
+    });
+});
+</script>
+{% endblock %}
