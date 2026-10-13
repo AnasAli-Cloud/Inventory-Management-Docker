@@ -42,4 +42,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 # Run the Flask application using Gunicorn (production-grade WSGI server)
 # - 1 worker for a single-machine demo; scale to 2-4 per CPU core in production
 # - Binds to 0.0.0.0 so Docker port mapping from host can reach it
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "app:app"]
+# - --access-logfile - prints HTTP requests and response codes directly to container stdout
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "--access-logfile", "-", "app:app"]
